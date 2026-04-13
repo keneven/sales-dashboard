@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>E-Commerce Sales Dashboard — Board Game Publisher</title>
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="data.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface-2: #232734;
+    --border: #2d3141;
+    --text: #e8eaed;
+    --text-muted: #8b8fa3;
+    --blue: #4e7cff;
+    --green: #34d399;
+    --amber: #fbbf24;
+    --red: #f87171;
+    --purple: #a78bfa;
+    --cyan: #22d3ee;
+    --pink: #f472b6;
+    --orange: #fb923c;
+  }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  .header {
+    padding: 32px 40px 24px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+  }
+  .header p {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-top: 4px;
+  }
+  .header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .filter-bar {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .filter-btn {
+    padding: 8px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-size: 13px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .filter-btn:hover { border-color: var(--blue); color: var(--text); }
+  .filter-btn.active { background: var(--blue); border-color: var(--blue); color: #fff; }
+
+  .dashboard {
+    padding: 24px 40px 60px;
+    max-width: 1440px;
+    margin: 0 auto;
+  }
+
+  /* KPI Cards */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px 22px;
+    transition: transform 0.2s, border-color 0.2s;
+  }
+  .kpi-card:hover { transform: translateY(-2px); border-color: var(--blue); }
+  .kpi-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.8px; font-weight: 600; }
+  .kpi-value { font-size: 32px; font-weight: 700; margin-top: 6px; letter-spacing: -1px; }
+  .kpi-sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+  .kpi-green { color: var(--green); }
+  .kpi-blue { color: var(--blue); }
+  .kpi-amber { color: var(--amber); }
+  .kpi-red { color: var(--red); }
+  .kpi-purple { color: var(--purple); }
+  .kpi-cyan { color: var(--cyan); }
+
+  /* Chart Grid */
+  .chart-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 24px;
+  }
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    min-height: 380px;
+  }
+  .chart-card.full { grid-column: 1 / -1; }
+  .chart-title {
+    font-size: 15px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .chart-title .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  /* Table */
+  .table-wrap {
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    color: var(--text-muted);
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:hover td { background: var(--surface-2); }
+  .badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-green { background: rgba(52,211,153,0.15); color: var(--green); }
+  .badge-red { background: rgba(248,113,113,0.15); color: var(--red); }
+  .badge-amber { background: rgba(251,191,36,0.15); color: var(--amber); }
+
+  .loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 60vh;
+    font-size: 18px;
+    color: var(--text-muted);
+  }
+
+  @media (max-width: 900px) {
+    .chart-grid { grid-template-columns: 1fr; }
+    .dashboard { padding: 16px; }
+    .header { padding: 20px 16px; }
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-row">
+    <div>
+      <h1>📊 E-Commerce Sales Dashboard</h1>
+      <p>Board Game Publisher — 2024 Annual Performance</p>
+    </div>
+    <div class="filter-bar" id="channelFilters"></div>
+  </div>
+</div>
+
+<div class="dashboard" id="dashboard">
+  <div class="loading">Loading data...</div>
+</div>
+
+<script>
+const COLORS = {
+  blue: '#4e7cff', green: '#34d399', amber: '#fbbf24', red: '#f87171',
+  purple: '#a78bfa', cyan: '#22d3ee', pink: '#f472b6', orange: '#fb923c',
+};
+const PALETTE = [COLORS.blue, COLORS.green, COLORS.amber, COLORS.red, COLORS.purple, COLORS.cyan, COLORS.pink, COLORS.orange];
+const PLOT_LAYOUT = {
+  paper_bgcolor: 'rgba(0,0,0,0)',
+  plot_bgcolor: 'rgba(0,0,0,0)',
+  font: { family: 'DM Sans', color: '#8b8fa3', size: 12 },
+  margin: { l: 50, r: 20, t: 10, b: 40 },
+  xaxis: { gridcolor: '#2d3141', zerolinecolor: '#2d3141' },
+  yaxis: { gridcolor: '#2d3141', zerolinecolor: '#2d3141' },
+};
+const PLOT_CONFIG = { displayModeBar: false, responsive: true };
+
+let allData = [];
+let activeChannel = 'All';
+
+// Embed CSV inline so it works on GitHub Pages without CORS issues
+function loadData() {
+  // Try embedded data first, fallback to CSV
+  if (typeof CSV_DATA !== 'undefined') {
+    processData(CSV_DATA);
+  } else {
+    Papa.parse('sales_data_2024.csv', {
+      download: true,
+      header: true,
+      dynamicTyping: true,
+      skipEmptyLines: true,
+      complete: function(results) { processData(results.data); }
+    });
+  }
+}
+
+function processData(rawData) {
+  allData = rawData.map(r => ({
+    ...r,
+    order_date: new Date(r.order_date),
+    month: new Date(r.order_date).getMonth(),
+    returned: r.returned === true || r.returned === 'True' || r.returned === 'true',
+    customer_rating: r.customer_rating === '' || r.customer_rating === null ? null : +r.customer_rating,
+    net_revenue: (r.returned === true || r.returned === 'True' || r.returned === 'true') ? 0 : +r.total_revenue,
+    quantity: +r.quantity || 1,
+  }));
+  buildFilters();
+  render(allData);
+}
+
+loadData();
+
+function buildFilters() {
+  const channels = ['All', ...new Set(allData.map(d => d.channel))];
+  const bar = document.getElementById('channelFilters');
+  channels.forEach(ch => {
+    const btn = document.createElement('button');
+    btn.className = 'filter-btn' + (ch === 'All' ? ' active' : '');
+    btn.textContent = ch;
+    btn.onclick = () => {
+      activeChannel = ch;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const filtered = ch === 'All' ? allData : allData.filter(d => d.channel === ch);
+      render(filtered);
+    };
+    bar.appendChild(btn);
+  });
+}
+
+function render(data) {
+  const dash = document.getElementById('dashboard');
+
+  const totalRev = data.reduce((s, d) => s + d.net_revenue, 0);
+  const totalOrders = data.length;
+  const avgOrder = totalRev / data.filter(d => d.net_revenue > 0).length;
+  const returnRate = data.filter(d => d.returned).length / totalOrders * 100;
+  const ratings = data.filter(d => d.customer_rating).map(d => d.customer_rating);
+  const avgRating = ratings.reduce((a, b) => a + b, 0) / ratings.length;
+  const totalUnits = data.reduce((s, d) => s + d.quantity, 0);
+
+  dash.innerHTML = `
+    <div class="kpi-row">
+      <div class="kpi-card">
+        <div class="kpi-label">Net Revenue</div>
+        <div class="kpi-value kpi-green">$${(totalRev/1000).toFixed(1)}K</div>
+        <div class="kpi-sub">${activeChannel === 'All' ? 'All channels' : activeChannel}</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Total Orders</div>
+        <div class="kpi-value kpi-blue">${totalOrders.toLocaleString()}</div>
+        <div class="kpi-sub">${totalUnits.toLocaleString()} units sold</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Avg Order Value</div>
+        <div class="kpi-value kpi-purple">$${avgOrder.toFixed(2)}</div>
+        <div class="kpi-sub">Per completed order</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Return Rate</div>
+        <div class="kpi-value kpi-red">${returnRate.toFixed(1)}%</div>
+        <div class="kpi-sub">${data.filter(d => d.returned).length} returns</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Avg Rating</div>
+        <div class="kpi-value kpi-amber">${avgRating.toFixed(2)}</div>
+        <div class="kpi-sub">${ratings.length} reviews</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">Products</div>
+        <div class="kpi-value kpi-cyan">${new Set(data.map(d => d.product_name)).size}</div>
+        <div class="kpi-sub">Active SKUs</div>
+      </div>
+    </div>
+
+    <div class="chart-grid">
+      <div class="chart-card full">
+        <div class="chart-title"><span class="dot" style="background:${COLORS.blue}"></span>Monthly Revenue Trend</div>
+        <div id="chart-monthly"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title"><span class="dot" style="background:${COLORS.green}"></span>Revenue by Channel</div>
+        <div id="chart-channel"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title"><span class="dot" style="background:${COLORS.purple}"></span>Category Breakdown</div>
+        <div id="chart-category"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title"><span class="dot" style="background:${COLORS.amber}"></span>Regional Distribution</div>
+        <div id="chart-region"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title"><span class="dot" style="background:${COLORS.pink}"></span>Promotion Effectiveness</div>
+        <div id="chart-promo"></div>
+      </div>
+      <div class="chart-card full">
+        <div class="chart-title"><span class="dot" style="background:${COLORS.orange}"></span>Top Products</div>
+        <div class="table-wrap" id="table-products"></div>
+      </div>
+    </div>
+  `;
+
+  plotMonthly(data);
+  plotChannel(data);
+  plotCategory(data);
+  plotRegion(data);
+  plotPromo(data);
+  buildProductTable(data);
+}
+
+function groupBy(data, key, valueFn) {
+  const map = {};
+  data.forEach(d => {
+    const k = typeof key === 'function' ? key(d) : d[key];
+    if (!map[k]) map[k] = [];
+    map[k].push(d);
+  });
+  const result = {};
+  Object.entries(map).forEach(([k, arr]) => { result[k] = valueFn(arr); });
+  return result;
+}
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function plotMonthly(data) {
+  const monthly = {};
+  data.forEach(d => {
+    const m = d.month;
+    monthly[m] = (monthly[m] || 0) + d.net_revenue;
+  });
+  const vals = MONTHS.map((_, i) => monthly[i] || 0);
+
+  Plotly.newPlot('chart-monthly', [{
+    x: MONTHS, y: vals, type: 'bar',
+    marker: { color: vals.map((v, i) => i >= 9 ? COLORS.green : COLORS.blue), borderRadius: 6 },
+    hovertemplate: '%{x}: $%{y:,.0f}<extra></extra>',
+  }], {
+    ...PLOT_LAYOUT,
+    margin: { ...PLOT_LAYOUT.margin, b: 50 },
+    yaxis: { ...PLOT_LAYOUT.yaxis, tickprefix: '$', tickformat: ',.0f' },
+    height: 300,
+  }, PLOT_CONFIG);
+}
+
+function plotChannel(data) {
+  const rev = groupBy(data, 'channel', arr => arr.reduce((s, d) => s + d.net_revenue, 0));
+  const sorted = Object.entries(rev).sort((a, b) => b[1] - a[1]);
+
+  Plotly.newPlot('chart-channel', [{
+    labels: sorted.map(s => s[0]),
+    values: sorted.map(s => s[1]),
+    type: 'pie',
+    hole: 0.55,
+    marker: { colors: PALETTE },
+    textinfo: 'percent',
+    textfont: { color: '#fff', size: 13 },
+    hovertemplate: '%{label}<br>$%{value:,.0f}<br>%{percent}<extra></extra>',
+  }], {
+    ...PLOT_LAYOUT,
+    margin: { l: 10, r: 10, t: 10, b: 10 },
+    showlegend: true,
+    legend: { font: { color: '#8b8fa3', size: 11 }, orientation: 'h', y: -0.1 },
+    height: 320,
+  }, PLOT_CONFIG);
+}
+
+function plotCategory(data) {
+  const rev = groupBy(data, 'category', arr => arr.reduce((s, d) => s + d.net_revenue, 0));
+  const sorted = Object.entries(rev).sort((a, b) => b[1] - a[1]);
+
+  Plotly.newPlot('chart-category', [{
+    x: sorted.map(s => s[0]),
+    y: sorted.map(s => s[1]),
+    type: 'bar',
+    marker: { color: PALETTE.slice(0, sorted.length) },
+    hovertemplate: '%{x}: $%{y:,.0f}<extra></extra>',
+  }], {
+    ...PLOT_LAYOUT,
+    yaxis: { ...PLOT_LAYOUT.yaxis, tickprefix: '$', tickformat: ',.0f' },
+    height: 320,
+  }, PLOT_CONFIG);
+}
+
+function plotRegion(data) {
+  const rev = groupBy(data, 'region', arr => arr.reduce((s, d) => s + d.net_revenue, 0));
+  const sorted = Object.entries(rev).sort((a, b) => b[1] - a[1]);
+
+  Plotly.newPlot('chart-region', [{
+    x: sorted.map(s => s[0]),
+    y: sorted.map(s => s[1]),
+    type: 'bar',
+    marker: { color: sorted.map((_, i) => PALETTE[i + 2]) },
+    hovertemplate: '%{x}: $%{y:,.0f}<extra></extra>',
+  }], {
+    ...PLOT_LAYOUT,
+    yaxis: { ...PLOT_LAYOUT.yaxis, tickprefix: '$', tickformat: ',.0f' },
+    height: 320,
+  }, PLOT_CONFIG);
+}
+
+function plotPromo(data) {
+  const promos = groupBy(data, d => d.promotion || 'No Promo', arr => ({
+    rev: arr.reduce((s, d) => s + d.net_revenue, 0),
+    count: arr.length,
+    avgOrder: arr.reduce((s, d) => s + d.net_revenue, 0) / arr.filter(d => d.net_revenue > 0).length,
+  }));
+  const sorted = Object.entries(promos).sort((a, b) => b[1].rev - a[1].rev);
+
+  Plotly.newPlot('chart-promo', [{
+    x: sorted.map(s => s[0]),
+    y: sorted.map(s => s[1].rev),
+    type: 'bar',
+    name: 'Revenue',
+    marker: { color: COLORS.blue },
+    hovertemplate: '%{x}<br>$%{y:,.0f}<extra></extra>',
+  }, {
+    x: sorted.map(s => s[0]),
+    y: sorted.map(s => s[1].avgOrder),
+    type: 'scatter',
+    mode: 'lines+markers',
+    name: 'Avg Order $',
+    yaxis: 'y2',
+    line: { color: COLORS.amber, width: 3 },
+    marker: { size: 8 },
+    hovertemplate: '%{x}<br>AOV: $%{y:.2f}<extra></extra>',
+  }], {
+    ...PLOT_LAYOUT,
+    yaxis: { ...PLOT_LAYOUT.yaxis, tickprefix: '$', tickformat: ',.0f', title: { text: 'Revenue', font: { size: 11 } } },
+    yaxis2: { overlaying: 'y', side: 'right', tickprefix: '$', gridcolor: 'transparent', font: { color: COLORS.amber } },
+    showlegend: true,
+    legend: { font: { size: 11 }, orientation: 'h', y: -0.2 },
+    height: 320,
+  }, PLOT_CONFIG);
+}
+
+function buildProductTable(data) {
+  const products = {};
+  data.forEach(d => {
+    if (!products[d.product_name]) {
+      products[d.product_name] = { rev: 0, units: 0, orders: 0, returns: 0, ratings: [], category: d.category };
+    }
+    const p = products[d.product_name];
+    p.rev += d.net_revenue;
+    p.units += d.quantity;
+    p.orders++;
+    if (d.returned) p.returns++;
+    if (d.customer_rating) p.ratings.push(d.customer_rating);
+  });
+
+  const sorted = Object.entries(products)
+    .map(([name, p]) => ({
+      name, ...p,
+      avgRating: p.ratings.length ? (p.ratings.reduce((a, b) => a + b, 0) / p.ratings.length) : 0,
+      returnRate: p.returns / p.orders * 100,
+    }))
+    .sort((a, b) => b.rev - a.rev);
+
+  const rows = sorted.map((p, i) => `
+    <tr>
+      <td style="font-weight:600;">${i + 1}</td>
+      <td style="font-weight:600;">${p.name}</td>
+      <td><span class="badge badge-green">${p.category}</span></td>
+      <td style="font-weight:600;color:${COLORS.green};">$${(p.rev/1000).toFixed(1)}K</td>
+      <td>${p.units.toLocaleString()}</td>
+      <td>${p.orders.toLocaleString()}</td>
+      <td style="color:${COLORS.amber};">${p.avgRating ? '★ ' + p.avgRating.toFixed(1) : '—'}</td>
+      <td><span class="badge ${p.returnRate > 6 ? 'badge-red' : p.returnRate > 4 ? 'badge-amber' : 'badge-green'}">${p.returnRate.toFixed(1)}%</span></td>
+    </tr>
+  `).join('');
+
+  document.getElementById('table-products').innerHTML = `
+    <table>
+      <thead><tr>
+        <th>#</th><th>Product</th><th>Category</th><th>Revenue</th><th>Units</th><th>Orders</th><th>Rating</th><th>Return Rate</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+</script>
+</body>
+</html>
